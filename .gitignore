@@ -99,3 +99,10 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+
+# My rule
+*.pass
+*.old
+test.py
+*.jpg

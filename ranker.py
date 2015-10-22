@@ -49,7 +49,7 @@ def getScoreImg(inPic, outPic):
     os.remove(inPic+'.temp')
 
 
-def getNumViaBaiduOCR(infile):
+def getNumViaBaiduOCR(infile, apikey):
     input_file=open(infile,'rb')
     img_base64=base64.b64encode(input_file.read())
     url = 'http://apis.baidu.com/apistore/idlocr/ocr'
@@ -64,7 +64,7 @@ def getNumViaBaiduOCR(infile):
     decode_data=urllib.parse.urlencode(data)
     req=urllib.request.Request(url,data=decode_data.encode('utf-8'))
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    req.add_header("apikey", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")#baidu api key
+    req.add_header("apikey", apikey)#baidu api key
     resp=urllib.request.urlopen(req)
     content=json.loads(resp.read().decode('utf-8'))
     textStr = content['retData'][0]['word']
@@ -79,12 +79,12 @@ def getNumViaBaiduOCR(infile):
     return point
 
 
-def rank_pic(infile):
+def rank_pic(infile, apikey):
     a=time.time()
     getScoreImg(infile, infile+'_temp.jpg')
     b=time.time()
     print('getScoreImg time: ', b-a)
-    point=getNumViaBaiduOCR(infile+'_temp.jpg')
+    point=getNumViaBaiduOCR(infile+'_temp.jpg', apikey)
     c=time.time()
     print('getNumViaBaiduOCR time: ', c-b)
     os.remove(infile+'_temp.jpg')
@@ -95,7 +95,11 @@ def rank_pic(infile):
 from projectoxford import Client
 import random
 
-client = Client("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx") #Oxford face api key
+with open('key.pass','r') as f1:
+    _api_keys = json.load(f1)
+
+    
+client = Client(_api_keys['projectoxford']['face']['sub']) #Oxford face api key
 
 def is_good_looking(f_in):
     the_face_list=client.face.detect({'stream':f_in})
@@ -144,9 +148,34 @@ def my_rank(f_name):
 
 #print(my_rank("1.jpg"))
 
+
+def ocr_via_oxford(f_in, key_):
+
+    cl = Client(key_)
+    ocrObject=cl.vision.ocr({'detectOrientation':False,
+        'language':'zh-Hant',
+        'path':f_in})
+    plain_list=[]
+    if ocrObject['regions']!=[]:
+        for i in ocrObject['regions']:
+            for j in i['lines']:
+                for k in j['words']:
+                    plain_list.append(k['text'])
+                plain_list.append('\n')
+            plain_list.append('\n\n')
+
+    return ''.join(plain_list)
+
+
+
+
+
 if __name__ == '__main__':
     import time
     a=time.time()
     print(my_rank("77.jpg"))
     b=time.time()
     print('total time: ',b-a)
+
+
+
