@@ -1,20 +1,20 @@
 import base64, json, time, os, threading, re
 import urllib.parse, urllib.request
+
+import requests
 from PIL import Image
 
-def getRawImgUrl(infile):
-    file_in=open(infile,'rb')
-    img_base64=base64.b64encode(file_in.read())
-    file_in.close()
+def get_raw_img_url(in_file, type='path'):
+    with open(in_file,'rb') as f_stream:
+        img_base64=base64.b64encode(f_stream.read())
 
     uploadUrl='http://kan.msxiaobing.com/Api/Image/UploadBase64'
-    resp=urllib.request.urlopen(uploadUrl,data=img_base64)
-    imgUrl='http://imageplatform.trafficmanager.cn'+json.loads(resp.read().decode('utf-8'))['Url']
-    #print(imgUrl)
-    return imgUrl
+
+    r = requests.post(uploadUrl, data=img_base64)
+    return 'http://imageplatform.trafficmanager.cn'+r.json()['Url']
 
 
-def getRespImgUrl(imgUrl):
+def get_ranked_img_url(imgUrl):
     sys_time=int(time.time())
     CompUrl='http://kan.msxiaobing.com/Api/ImageAnalyze/Comparison'
     form={
@@ -23,24 +23,21 @@ def getRespImgUrl(imgUrl):
         'senderId':'mtuId'+str(sys_time-242)+'717',
         'content[imageUrl]':imgUrl,
         }
-    
-    resp=urllib.request.urlopen(CompUrl,
-        data=urllib.parse.urlencode(form).encode('utf-8'))
-    respUrl=json.loads(resp.read().decode('utf-8'))['content']['imageUrl']
-    return respUrl
+
+    r = requests.post(CompUrl, data=form)
+    return r.json()['content']['imageUrl']
 
 
-def saveUrlAsFile(respurl,outfile):
-    file_out=open(outfile,'wb')
-    resp=urllib.request.urlopen(respurl)
-    file_out.write(resp.read())
-    file_out.close()
+def img_url_to_file(img_url, out_file):
+    with open(out_file,'wb') as f_out:
+        resp=requests.get(img_url)
+        f_out.write(resp.content)
 
 
 def getScoreImg(inPic, outPic):
-    rawurl=getRawImgUrl(inPic)      #no good
-    respurl=getRespImgUrl(rawurl)
-    saveUrlAsFile(respurl, inPic+'.temp')
+    rawurl=get_raw_img_url(inPic)      #no good
+    respurl=get_ranked_img_url(rawurl)
+    img_url_to_file(respurl, inPic+'.temp')
     img1=Image.open(inPic+'.temp')
     box=(240,1300,1210,1520)    #(left, upper, right, lower)
     img2=img1.crop(box)
