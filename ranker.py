@@ -149,7 +149,23 @@ def my_rank(f_name):
 #print(my_rank("1.jpg"))
 
 
-def ocr_via_oxford(f_in, key_):
+
+def _if_contains(l_a,l_b):#  a in b
+    a_x=int(l_a[0])
+    a_y=int(l_a[1])
+    a_w=int(l_a[2])
+    a_h=int(l_a[3])
+
+    b_x=int(l_b[0])
+    b_y=int(l_b[1])
+    b_w=int(l_b[2])
+    b_h=int(l_b[3])
+
+    return a_x>b_x and a_y>b_y and (a_x+a_w)<(b_x+b_w) and (a_y+a_h)<(b_y+b_h)
+
+
+def ocr_via_oxford(f_in, key_, dect_area=(210,1200,1100,330)):
+    """(210,1200,1100,330)"""
 
     cl = Client(key_)
     ocrObject=cl.vision.ocr({'detectOrientation':False,
@@ -160,22 +176,22 @@ def ocr_via_oxford(f_in, key_):
         for i in ocrObject['regions']:
             for j in i['lines']:
                 for k in j['words']:
-                    plain_list.append(k['text'])
+                    word_area=k["boundingBox"].split(',')
+                    if _if_contains(word_area, dect_area):
+                        plain_list.append(k['text'])
+
                 plain_list.append('\n')
             plain_list.append('\n\n')
 
-    return ''.join(plain_list)
+    return ''.join(plain_list).strip()
 
 
 
 
 
 if __name__ == '__main__':
-    import time
-    a=time.time()
-    print(my_rank("77.jpg"))
-    b=time.time()
-    print('total time: ',b-a)
+    f_in='fetchimage.jpg'
+    print(ocr_via_oxford(f_in, _api_keys['projectoxford']['vision']['sub']))
 
 
 
