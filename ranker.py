@@ -34,17 +34,27 @@ def img_url_to_file(img_url, out_file):
         f_out.write(resp.content)
 
 
-def getScoreImg(inPic, outPic):
-    rawurl=get_raw_img_url(inPic)      #no good
-    respurl=get_ranked_img_url(rawurl)
-    img_url_to_file(respurl, inPic+'.temp')
-    img1=Image.open(inPic+'.temp')
-    box=(240,1300,1210,1520)    #(left, upper, right, lower)
-    img2=img1.crop(box)
-    img1.close()
-    img2.save(outPic)#no good
-    os.remove(inPic+'.temp')
+def get_cropped_img(img_url, out_pic, box=(240,1280,1210,1530)):
+    img_url_to_file(img_url, out_pic+'.tmp')
+    with Image.open(out_pic+'.tmp') as img1:
+        img2=img1.crop(box)
+        img2.save(out_pic)
+        img2.close()
+    os.remove(out_pic+'.tmp')
+    return out_pic
 
+"""
+TODO:
+get_evaluation_words(in_pic):
+    upload or move to nginx path
+    get_ranked_img_url
+    baidu or ms ocr:
+        baidu:  get_cropped_img
+                ocr
+        MS:     ocr
+    trim
+    def get rank point?
+"""
 
 def getNumViaBaiduOCR(infile, apikey):
     input_file=open(infile,'rb')
@@ -147,22 +157,15 @@ def my_rank(f_name):
 
 
 
-def _if_contains(l_a,l_b):#  a in b
-    a_x=int(l_a[0])
-    a_y=int(l_a[1])
-    a_w=int(l_a[2])
-    a_h=int(l_a[3])
-
-    b_x=int(l_b[0])
-    b_y=int(l_b[1])
-    b_w=int(l_b[2])
-    b_h=int(l_b[3])
-
-    return a_x>b_x and a_y>b_y and (a_x+a_w)<(b_x+b_w) and (a_y+a_h)<(b_y+b_h)
-
-
 def ocr_via_oxford(f_in, key_, dect_area=(210,1200,1100,330)):
     """(210,1200,1100,330)"""
+    def _if_contains(l_a,l_b):#  a in b
+        a=[int(i) for i in l_a]
+        b=[int(i) for i in l_b]
+
+        return ( a[0]>b[0] and a[1]>b[1] and 
+                (a[0]+a[2])<(b[0]+b[2]) and 
+                (a[1]+a[3])<(b[1]+b[3]) )
 
     cl = Client(key_)
     ocrObject=cl.vision.ocr({'detectOrientation':False,
