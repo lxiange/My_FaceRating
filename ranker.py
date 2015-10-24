@@ -32,6 +32,7 @@ def img_url_to_file(img_url, out_file):
     with open(out_file,'wb') as f_out:
         resp=requests.get(img_url)
         f_out.write(resp.content)
+    return out_file
 
 
 def get_cropped_img(img_url, out_pic, box=(240,1280,1210,1530)):
@@ -49,41 +50,40 @@ get_evaluation_words(in_pic):
     upload or move to nginx path
     get_ranked_img_url
     baidu or ms ocr:
-        baidu:  get_cropped_img
-                ocr
-        MS:     ocr
+        baidu:  get_cropped_img     #DONE
+                ocr                 #DONE
+        MS:     ocr                 #DONE
     trim
     def get rank point?
 """
 
-def getNumViaBaiduOCR(infile, apikey):
-    input_file=open(infile,'rb')
-    img_base64=base64.b64encode(input_file.read())
+def ocr_via_baidu(url, apikey):
+    rand_name=str(int(time.time()))+'.jpg'
+    get_cropped_img(url, rand_name)
+    with open(rand_name, 'rb') as input_file:
+        img_base64=base64.b64encode(input_file.read())
     url = 'http://apis.baidu.com/apistore/idlocr/ocr'
-    data={}
-    data['fromdevice'] = "pc"
-    data['clientip'] = "10.10.10.0"
-    data['detecttype'] = "LocateRecognize"
-    data['languagetype'] = "CHN_ENG"
-    data['imagetype'] = "1"
-    data['image'] = img_base64
+    data={'fromdevice':"pc", 'clientip':"10.10.10.0", 'detecttype':"LocateRecognize",
+            'languagetype':"CHN_ENG", 'imagetype':"1", 'image':img_base64 }
+    headers={
+        "Content-Type":"application/x-www-form-urlencoded",
+        "apikey":apikey
+    }
+    req = requests.post(url, data, headers= headers)
+    resp=req.json()
+    words=[i['word'] for i in resp['retData']]
+    os.remove(rand_name)
+    return ''.join(words)
 
-    decode_data=urllib.parse.urlencode(data)
-    req=urllib.request.Request(url,data=decode_data.encode('utf-8'))
-    req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    req.add_header("apikey", apikey)#baidu api key
-    resp=urllib.request.urlopen(req)
-    content=json.loads(resp.read().decode('utf-8'))
-    textStr = content['retData'][0]['word']
 
-    match=re.search(r'\d{2}|\d\.\d',textStr)
-    pointStr=match.group(0)
-    point=float(pointStr)
-    if point <= 10:      # . is identified
-        point *= 10
-    if point <= 20:      # 7 is identified as 1
-        point += 60
-    return point
+#     match=re.search(r'\d{2}|\d\.\d',textStr)
+#     pointStr=match.group(0)
+#     point=float(pointStr)
+#     if point <= 10:      # . is identified
+#         point *= 10
+#     if point <= 20:      # 7 is identified as 1
+#         point += 60
+#     return point
 
 
 def rank_pic(infile, apikey):
@@ -157,36 +157,20 @@ def my_rank(f_name):
 
 
 
-def ocr_via_oxford(f_in, key_, dect_area=(210,1200,1100,330)):
-    """(210,1200,1100,330)"""
+def ocr_via_oxford(input, key_, type='url', dect_area=(210,1200,1100,330)):
     def _if_contains(l_a,l_b):#  a in b
         a=[int(i) for i in l_a]
         b=[int(i) for i in l_b]
-
         return ( a[0]>b[0] and a[1]>b[1] and 
                 (a[0]+a[2])<(b[0]+b[2]) and 
                 (a[1]+a[3])<(b[1]+b[3]) )
 
     cl = Client(key_)
-    ocrObject=cl.vision.ocr({'detectOrientation':False,
-        'language':'zh-Hant',
-        'path':f_in})
-    plain_list=[]
-    if ocrObject['regions']!=[]:
-        for i in ocrObject['regions']:
-            for j in i['lines']:
-                for k in j['words']:
-                    word_area=k["boundingBox"].split(',')
-                    if _if_contains(word_area, dect_area):
-                        plain_list.append(k['text'])
 
-                plain_list.append('\n')
-            plain_list.append('\n\n')
+    ocr_obj=cl.vision.ocr({'detectOrientation':False, 'language':'zh-Hant', type:input})
 
+    plain_list=[k['text'] for i in ocr_obj['regions'] for j in i['lines'] for k in j['words']]
     return ''.join(plain_list).strip()
-
-
-
 
 
 if __name__ == '__main__':
