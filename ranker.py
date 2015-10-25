@@ -4,7 +4,7 @@ import urllib.parse, urllib.request
 import requests
 from PIL import Image
 
-def get_raw_img_url(in_file, type='path'):
+def get_raw_img_url(in_file, mode_='path'):
     with open(in_file,'rb') as f_stream:
         img_base64=base64.b64encode(f_stream.read())
 
@@ -47,14 +47,14 @@ def get_cropped_img(img_url, out_pic, box=(240,1280,1210,1530)):
 """
 TODO:
 get_evaluation_words(in_pic):
-    upload or move to nginx path
+    upload or move to nginx path    #TODO
     get_ranked_img_url
     baidu or ms ocr:
         baidu:  get_cropped_img     #DONE
                 ocr                 #DONE
         MS:     ocr                 #DONE
-    trim
-    def get rank point?
+    trim                            #DONE
+    def get rank point?             #DONE
 """
 
 def ocr_via_baidu(url, apikey):
@@ -76,28 +76,54 @@ def ocr_via_baidu(url, apikey):
     return ''.join(words)
 
 
-#     match=re.search(r'\d{2}|\d\.\d',textStr)
-#     pointStr=match.group(0)
-#     point=float(pointStr)
-#     if point <= 10:      # . is identified
-#         point *= 10
-#     if point <= 20:      # 7 is identified as 1
-#         point += 60
-#     return point
+def ocr_via_oxford(input, key_, mode_='url', dect_area=(210,1200,1100,330)):
+    def _if_contains(l_a,l_b):#  a in b
+        a=[int(i) for i in l_a]
+        b=[int(i) for i in l_b]
+        return ( a[0]>b[0] and a[1]>b[1] and 
+                (a[0]+a[2])<(b[0]+b[2]) and 
+                (a[1]+a[3])<(b[1]+b[3]) )
+
+    cl = Client(key_)
+    ocr_obj=cl.vision.ocr({'detectOrientation':False, 'language':'zh-Hant', mode_:input})
+
+    plain_list=[k['text'] for i in ocr_obj['regions'] for j in i['lines'] for k in j['words'] 
+                    if _if_contains(k["boundingBox"].split(','), dect_area)]
+    return ''.join(plain_list).strip()
 
 
-def rank_pic(infile, apikey):
-    a=time.time()
-    getScoreImg(infile, infile+'_temp.jpg')
-    b=time.time()
-    print('getScoreImg time: ', b-a)
-    point=getNumViaBaiduOCR(infile+'_temp.jpg', apikey)
-    c=time.time()
-    print('getNumViaBaiduOCR time: ', c-b)
-    os.remove(infile+'_temp.jpg')
-    if not 10<point<100: 
-        return -1
-    return int(point)
+def extract_point(text):
+    match=re.search(r'\d[.·,。，]?\d',text)
+    point_str=match.group(0)
+    useless_char=['.','·',',','，','。']
+    for i in useless_char:
+        point_str=point_str.replace(i,'')
+    point=int(point_str)
+    if point<20:        #    7 is identified as 1
+        point+=60
+    return point
+
+
+def rank_pic(in_file, api_key, mode_='fool', engine='oxford'):
+    if mode_=='smart':
+        pass
+        #   move pic to /www/pic
+        #   imgUrl='http://vpsip/pic/xxxx.jpg'
+    elif mode_=='fool':
+        imgUrl=get_raw_img_url(in_file)
+    else:
+        return ''
+
+    resp_url=get_ranked_img_url(imgUrl)
+    
+    if engine=='oxford':
+        return ocr_via_oxford(resp_url, api_key)
+    elif engine=='baidu':
+        return ocr_via_baidu(resp_url, api_key)
+    else:
+        return ''
+
+
 
 from projectoxford import Client
 import random
@@ -157,20 +183,6 @@ def my_rank(f_name):
 
 
 
-def ocr_via_oxford(input, key_, type='url', dect_area=(210,1200,1100,330)):
-    def _if_contains(l_a,l_b):#  a in b
-        a=[int(i) for i in l_a]
-        b=[int(i) for i in l_b]
-        return ( a[0]>b[0] and a[1]>b[1] and 
-                (a[0]+a[2])<(b[0]+b[2]) and 
-                (a[1]+a[3])<(b[1]+b[3]) )
-
-    cl = Client(key_)
-
-    ocr_obj=cl.vision.ocr({'detectOrientation':False, 'language':'zh-Hant', type:input})
-
-    plain_list=[k['text'] for i in ocr_obj['regions'] for j in i['lines'] for k in j['words']]
-    return ''.join(plain_list).strip()
 
 
 if __name__ == '__main__':
