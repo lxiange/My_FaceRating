@@ -76,7 +76,7 @@ def ocr_via_baidu(url, apikey):
     return ''.join(words)
 
 
-def ocr_via_oxford(input, key_, mode_='url', dect_area=(210,1200,1100,330)):
+def ocr_via_oxford(in_put_, key_, mode_='url', dect_area=(210,1200,1100,330)):
     def _if_contains(l_a,l_b):#  a in b
         a=[int(i) for i in l_a]
         b=[int(i) for i in l_b]
@@ -85,7 +85,7 @@ def ocr_via_oxford(input, key_, mode_='url', dect_area=(210,1200,1100,330)):
                 (a[1]+a[3])<(b[1]+b[3]) )
 
     cl = Client(key_)
-    ocr_obj=cl.vision.ocr({'detectOrientation':False, 'language':'zh-Hant', mode_:input})
+    ocr_obj=cl.vision.ocr({'detectOrientation':False, 'language':'zh-Hant', mode_:in_put_})
 
     plain_list=[k['text'] for i in ocr_obj['regions'] for j in i['lines'] for k in j['words'] 
                     if _if_contains(k["boundingBox"].split(','), dect_area)]
@@ -125,39 +125,22 @@ def rank_pic(in_file, api_key, mode_='fool', engine='oxford'):
 
 
 
-from projectoxford import Client
-import random
+def identify_person(in_put_, mode_='path', group_id = 'goodlooking_group'):
+    the_face_list=client.face.detect({mode_:in_put_})
 
-with open('key.pass','r') as f1:
-    _api_keys = json.load(f1)
+    person_id_dict={'f38edcbb-f17e-4c24-a819-daf3d022ba30':'LiHan'}     #NOT good.
 
-    
-client = Client(_api_keys['projectoxford']['face']['sub']) #Oxford face api key
-
-def is_good_looking(f_in):
-    the_face_list=client.face.detect({'stream':f_in})
-    '''
-    if len(the_face_list)>1:
-        return False
-        #assert (0)
-    '''
     faceid_list=[]
     for i in the_face_list:
         faceid_list.append(i['faceId'])
 
-    candidates_list=client.face.identify("goodlooking_group", faceid_list)  #only match 1 person
-    #print(candidates_list)
-    if len(candidates_list)>1:
-        for i in candidates_list:
-            if i['candidates']!=[]:
-                if i['candidates'][0]['confidence']>0.6:
-                    return True
-        return False
-    else:
-        if(candidates_list[0]['candidates']!=[]):
-            if candidates_list[0]['candidates'][0]['confidence']>0.6:
-                return True
-        return False
+    candidates_list=client.face.identify(group_id, faceid_list)  #only match 1 
+    person_list=[]
+    for i in candidates_list:
+        if i['candidates']!=[] and i['candidates'][0]['confidence'] > 0.6:
+            person_list.append(person_id_dict[i['candidates'][0]['personId']])
+    
+    return person_list
 
 
 def my_rank(f_name):
@@ -170,9 +153,9 @@ def my_rank(f_name):
     out.save("temp/"+f_name)
     f_in = open("temp/"+f_name, 'rb')
     t_s=time.time()
-    flag = is_good_looking(f_in)
+    flag = identify_person(f_in)
     t_e=time.time()
-    print("is_good_looking time: ",t_e-t_s)
+    print("identify_person time: ",t_e-t_s)
     if flag:
         return '哇，李晗女神！这张脸我给 '+str(random.randint(95,99))+' 分！'
     else:
@@ -184,10 +167,19 @@ def my_rank(f_name):
 
 
 
+from projectoxford import Client
+import random
+
+with open('key.pass','r') as f1:
+    _api_keys = json.load(f1)
+
+    
+client = Client(_api_keys['projectoxford']['face']['sub']) #Oxford face api key
+
 
 if __name__ == '__main__':
-    f_in='fetchimage.jpg'
-    print(ocr_via_oxford(f_in, _api_keys['projectoxford']['vision']['sub']))
+    f_in='6.jpg'
+    print(identify_person(f_in))
 
 
 
