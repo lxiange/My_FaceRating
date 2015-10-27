@@ -143,26 +143,33 @@ def identify_person(in_put_, mode_='path', group_id = 'goodlooking_group'):
     return person_list
 
 
+#TODO:
+# use tinypng to compress pictures.
+# use lrz4 to compress pic in user's browser.
+def compress_pic(f_name, width=700):
+    with Image.open(f_name) as img1:
+        (r_x, r_y)=img1.size
+        a_x=700
+        a_y=int(r_y * a_x / r_x)
+        out=img1.resize((a_x,a_y),Image.ANTIALIAS)
+        out.save("compressed/"+f_name)
+
+
+#TODO:
+# reduce the transmisson times.
+# enable 'smart' mode!
 def my_rank(f_name):
-    #f_in = open(f_name, 'rb')
-    img1=Image.open(f_name)
-    (r_x, r_y)=img1.size
-    a_x=700
-    a_y=int(r_y * a_x / r_x)
-    out=img1.resize((a_x,a_y),Image.ANTIALIAS)
-    out.save("temp/"+f_name)
-    f_in = open("temp/"+f_name, 'rb')
+    comment={'LiHan':'哇，李晗女神！这张脸我给 %d 分！'%random.randint(95,99)}
     t_s=time.time()
-    flag = identify_person(f_in)
+    person_list=identify_person(f_name)
     t_e=time.time()
     print("identify_person time: ",t_e-t_s)
-    if flag:
-        return '哇，李晗女神！这张脸我给 '+str(random.randint(95,99))+' 分！'
-    else:
-        return 'your rank: '+str(rank_pic("temp/"+f_name))
-        #return random.randint(49,85)
 
-#print(my_rank("1.jpg"))
+    if person_list:
+        comm_list=[comment[i] for i in person_list]
+        return comm_list
+    return "fuckyou"
+
 
 
 
@@ -179,7 +186,7 @@ client = Client(_api_keys['projectoxford']['face']['sub']) #Oxford face api key
 
 if __name__ == '__main__':
     f_in='6.jpg'
-    print(identify_person(f_in))
+    print(my_rank(f_in))
 
 
 
