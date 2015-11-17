@@ -31,61 +31,26 @@ def get_raw_img_url(in_file):
     return 'http://imageplatform.trafficmanager.cn' + resp.json()['Url']
 
 
-def get_ranked_img_url(img_url):
-    """Input a pic, and get ranked pic's url.
-
+def get_judgements(img_url):
+    """Get Xiaobing's judgement
     Args:
-        img_url <str>: Raw pic's url.
+        img_url <str>: the photo's url.
 
     Returns:
-        A string of the ranked pic.
+        A string of Xiaobing's judgement.
     """
     sys_time = int(time.time())
-    comp_url = 'http://kan.msxiaobing.com/Api/ImageAnalyze/Comparison'
-    form = {
+    comp_url = 'http://kan.msxiaobing.com/Api/ImageAnalyze/Process'
+    payload = {'service': 'yanzhi', 'tid': '04a01fbe5f5c4b7496034ad9cf41ff01'}
+    form = {  # don't ask me why, it's just magic numbers~
         'msgId': str(sys_time) + '233',
         'timestamp': sys_time,
         'senderId': 'mtuId' + str(sys_time - 242) + '717',
         'content[imageUrl]': img_url,
     }
+    resp = requests.post(comp_url, params=payload, data=form)
+    return resp.json()['content']['text']
 
-    resp = requests.post(comp_url, data=form)
-    print(resp.text)
-    return resp.json()['content']['imageUrl']
-
-
-def img_url_to_file(img_url, out_file):
-    """Save the img's url to file
-    Args:
-        img_url <str>: the image's url.
-        out_file <str>: the filename you want to save as.
-
-    Returns:
-        out_file's name, while it doesn't make any sense...
-    """
-    with open(out_file, 'wb') as f_out:
-        resp = requests.get(img_url)
-        f_out.write(resp.content)
-    return out_file
-
-
-def get_cropped_img(img_url, out_pic, box=(240, 1280, 1210, 1530)):
-    """Crop the pic
-    Args:
-        img_url <str>: the raw image's url.
-        out_pic <str>: the output file's name.
-        box <tuple>: the area to be saved.
-
-    Returns:
-        out_file's name, while it doesn't make any sense...
-    """
-    img_url_to_file(img_url, out_pic + '.tmp')
-    with Image.open(out_pic + '.tmp') as img1:
-        img2 = img1.crop(box)
-        img2.save(out_pic)
-        img2.close()
-    os.remove(out_pic + '.tmp')
-    return out_pic
 
 """
 TODO:
@@ -100,66 +65,6 @@ get_evaluation_words(in_pic):
     def get rank point?             #DONE
 """
 
-
-def ocr_via_baidu(url, apikey):
-    """Get Xiaobing's judgement via Baidu ocr engine.   // not recommended.
-
-    Baidu's ocr engine does not support url mode, 
-    so we should download&crop the pic first.
-
-    Args:
-        url <str>: the image's url.
-        apikey: your baidu ocr api key.
-
-    Returns:
-        A str of tht recognition result.
-    """
-    rand_name = str(int(time.time())) + '.jpg'
-    get_cropped_img(url, rand_name)
-    with open(rand_name, 'rb') as input_file:
-        img_base64 = base64.b64encode(input_file.read())
-    url = 'http://apis.baidu.com/apistore/idlocr/ocr'
-    data = {'fromdevice': "pc", 'clientip': "10.10.10.0",
-            'detecttype': "LocateRecognize",
-            'languagetype': "CHN_ENG", 'imagetype': "1", 'image': img_base64}
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "apikey": apikey
-    }
-    req = requests.post(url, data, headers=headers)
-    resp = req.json()
-    words = [i['word'] for i in resp['retData']]
-    os.remove(rand_name)
-    return ''.join(words)
-
-
-def ocr_via_oxford(in_put_, api_key, mode_='url', dect_area=(210, 1200, 1100, 330)):
-    """Get Xiaobing's judgement via Oxford ocr engine.
-    Args:
-        in_put_ <str>: the input, url is recommended.
-        api_key <str>: your Project Oxford Vision API key.
-        mode_ <str>: your input type. 
-                     Other mode can refer to projectoxford.Client
-        dect_area <tuple>: the area in the pic to be detected.
-
-    Returns:
-        A str of tht recognition result.
-    """
-    def _if_contains(l_a, l_b):  # a in b
-        """if area b contains area a"""
-        a = [int(i) for i in l_a]
-        b = [int(i) for i in l_b]
-        return (a[0] > b[0] and a[1] > b[1] and
-                (a[0] + a[2]) < (b[0] + b[2]) and
-                (a[1] + a[3]) < (b[1] + b[3]))
-
-    vision_client = Client(api_key)
-    ocr_obj = vision_client.vision.ocr(
-        {'detectOrientation': False, 'language': 'zh-Hant', mode_: in_put_})
-
-    plain_list = [k['text'] for i in ocr_obj['regions'] for j in i['lines'] for k in j['words']
-                  if _if_contains(k["boundingBox"].split(','), dect_area)]
-    return ''.join(plain_list).strip()
 
 
 def extract_point(text):
@@ -183,7 +88,8 @@ def extract_point(text):
     return point
 
 
-def rank_pic(in_file, api_key, mode_='fool', engine='oxford'):
+def rank_pic(in_file, api_key, mode_='fool'):
+    """TODO"""
     if mode_ == 'smart':
         pass
         #   move pic to /www/pic
@@ -193,14 +99,8 @@ def rank_pic(in_file, api_key, mode_='fool', engine='oxford'):
     else:
         return ''
 
-    resp_url = get_ranked_img_url(imgUrl)
-
-    if engine == 'oxford':
-        return ocr_via_oxford(resp_url, api_key)
-    elif engine == 'baidu':
-        return ocr_via_baidu(resp_url, api_key)
-    else:
-        return ''
+    judges = get_judgements(imgUrl)
+    return extract_point(judges)
 
 
 def identify_person(in_put_, mode_='path', group_id='goodlooking_group'):
@@ -213,7 +113,8 @@ def identify_person(in_put_, mode_='path', group_id='goodlooking_group'):
     for i in the_face_list:
         faceid_list.append(i['faceId'])
 
-    candidates_list = client.face.identify(group_id, faceid_list)  # only match 1
+    candidates_list = client.face.identify(
+        group_id, faceid_list)  # only match 1
     person_list = []
     for i in candidates_list:
         if i['candidates'] != [] and i['candidates'][0]['confidence'] > 0.6:
@@ -259,8 +160,6 @@ class MyRanker(object):
         self.face_client = Client(face_api_key)
         self.key = face_api_key
 
-
-
     def create_person(self, personGroupId, faceIds, name, userData=None):
         """Creates a new person in a specified person group for identification.
         The number of persons has a subscription limit. Free subscription amount is 1000 persons.
@@ -284,8 +183,6 @@ class MyRanker(object):
 
         uri = _personUrl + '/' + personGroupId + '/persons'
         return self._invoke('post', uri, json=body, headers={'Ocp-Apim-Subscription-Key': self.key})
-
-
 
     def list_groups(self):
         return self._invoke('get', _personGroupUrl,
@@ -378,10 +275,9 @@ if __name__ == '__main__':
 
     # client = Client(_api_keys['projectoxford']['face']['sub'])
 
-    print(rank_pic('77.jpg',_api_keys['projectoxford']['face']['sub']))
-    # my_ranker = MyRanker(_api_keys['projectoxford']['face']['sub'])
-    #print(my_ranker.create('ugly_group','ugly_group','People in this group is ugly.'))
-    # print(my_ranker.list_groups())
-    # f_in = '6.jpg'
-    # print(my_rank(f_in))
-    # print(client.face.get('goodlooking_group'))
+    # url = get_raw_img_url('77.jpg')
+
+    url = 'http://139.129.25.147/6.jpg'
+    judge = get_judgements(url)
+
+    print(judge)
