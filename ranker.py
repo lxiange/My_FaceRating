@@ -1,14 +1,11 @@
 """
 It's the main file.
 """
-import base64
 import json
 import time
-import os
-import re
-import requests
 from PIL import Image
 from projectoxford import Client
+from projectoxford import PersonGroup
 import random
 
 from xiaobingv3 import XiaoBingV3
@@ -28,33 +25,13 @@ get_evaluation_words(in_pic):
 """
 
 
-def identify_person(in_put_, mode_='path', group_id='goodlooking_group'):
-    the_face_list = client.face.detect({mode_: in_put_})
-
-    # NOT good.
-    person_id_dict = {'f38edcbb-f17e-4c24-a819-daf3d022ba30': 'LiHan'}
-
-    faceid_list = []
-    for i in the_face_list:
-        faceid_list.append(i['faceId'])
-
-    candidates_list = client.face.identify(
-        group_id, faceid_list)  # only match 1
-    person_list = []
-    for i in candidates_list:
-        if i['candidates'] != [] and i['candidates'][0]['confidence'] > 0.6:
-            person_list.append(person_id_dict[i['candidates'][0]['personId']])
-
-    return person_list
-
-
 # TODO:
 # use tinypng to compress pictures.
 # use lrz4 to compress pic in user's browser.
 def compress_pic(f_name, width=700):
     with Image.open(f_name) as img1:
         (r_x, r_y) = img1.size
-        a_x = 700
+        a_x = width
         a_y = int(r_y * a_x / r_x)
         out = img1.resize((a_x, a_y), Image.ANTIALIAS)
         out.save("compressed/" + f_name)
@@ -82,44 +59,58 @@ class MyRanker(object):
     def __init__(self, arg):
         self.api_key = arg
         self.client = Client(self.api_key)
-        self.person_id_dict = {'f38edcbb-f17e-4c24-a819-daf3d022ba30': 'LiHan'}
+        self.xiaobing = XiaoBingV3()
+        self.person_id_dict = {'f38edcbb-f17e-4c24-a819-daf3d022ba30': 'LiHan',
+                               '111': 'LiXiang',
+                               '222': 'WangJunTian'}
 
+    def get_faces_list(self, option):
+        resp = self.client.face.detect(option)
+        face_list = [i['faceId']for i in resp]
+        return face_list
 
-    #TODO: refactor, split into two functions
-    def identify_person(self, in_put_, mode_='path', group_id='goodlooking_group'):
-        the_face_list = self.client.face.detect({mode_: in_put_})
-
-        faceid_list = []
-        for i in the_face_list:
-            faceid_list.append(i['faceId'])
-
+    def _identify_person(self, faceid_list, group_id='goodlooking_group'):
         candidates_list = self.client.face.identify(group_id, faceid_list)
-        #only match 1 person.
-
-        person_list = []
+        face_person = {}
         for i in candidates_list:
-            if i['candidates'] != [] and i['candidates'][0]['confidence'] > 0.6:
-                person_list.append(self.person_id_dict[
-                                   i['candidates'][0]['personId']])
+            sub_cand = i['candidates']
+            for j in sub_cand:
+                if j['confidence'] > 0.6:
+                    face_person[i['faceId']] = j['personId']
+                    # only find one people
+                    break
+        return face_person
 
-        return person_list
+    def get_person_list(self, input_, mode_='path', need_bad=False):
+        persons = {'good': [], 'bad': []}
+
+        face_list = self.get_faces_list({mode_: input_})
+
+        face_person = self._identify_person(face_list)
+        for fid in face_person:
+            if face_person[fid] in self.person_id_dict:
+                persons['good'].append(self.person_id_dict[face_person[fid]])
+
+        if need_bad:
+            face_person = self._identify_person(face_list, 'ugly_group')
+            for fid in face_person:
+                if face_person[fid] in self.person_id_dict:
+                    persons['bad'].append(self.person_id_dict[face_person[fid]])
+
+        return persons
+
+    # TODO: try *args **kw ?
+    def rank(self, input_, mode_='path', is_num=False):
+        return 0
 
 
 if __name__ == '__main__':
     with open('key.pass', 'r') as f1:
         _api_keys = json.load(f1)
 
-    # client = Client(_api_keys['projectoxford']['face']['sub'])
-
-    # url = get_raw_img_url('77.jpg')
-
     url_0 = 'http://139.129.25.147/6.jpg'
     url_1 = 'http://njucser.tk/6.jpg'
-    # judge = get_judgements(url)
-
-    # pg = PersonGroup(_api_keys)
-    # print(pg.list())
-
-    xb = XiaoBingV3()
-    xb._get_raw_img_url('6.jpg')
-    print(xb.rank('6.jpg'))
+    mr = MyRanker(_api_keys['projectoxford']['face']['sub'])
+    print(mr.get_person_list(url_1, 'url'))
+    # pp = PersonGroup(_api_keys['projectoxford']['face']['sub'])
+    # print(pp.list())

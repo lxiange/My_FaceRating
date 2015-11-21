@@ -76,19 +76,19 @@ class XiaoBingV3(object):
             point += 60
         return point
 
-    def rank(self, input_, mode_='file', is_num=False):
+    def rank(self, input_, mode_='path', is_num=False):
         """Use Xiaobing V3 to rank the pic.
 
         Args:
             input_ <str>: the pic's filename or url.
-            mode_ <str>: 'file' or 'url', depends on the input type.
+            mode_ <str>: 'path' or 'url', depends on the input type.
             is_num <bool>: return the score or retain the comment.
 
         Returns:
             An int or str, depends on the value of is_num
 
         """
-        if mode_ == 'file':
+        if mode_ == 'path':
             raw_url = self._get_raw_img_url(input_)
         else:
             raw_url = input_
