@@ -40,17 +40,7 @@ def compress_pic(f_name, width=700):
 # TODO:
 # reduce the transmisson times.
 # enable 'smart' mode!
-def my_rank(f_name):
-    comment = {'LiHan': '哇，李晗女神！这张脸我给 %d 分！' % random.randint(95, 99)}
-    t_s = time.time()
-    person_list = identify_person(f_name)
-    t_e = time.time()
-    print("identify_person time: ", t_e - t_s)
 
-    if person_list:
-        comm_list = [comment[i] for i in person_list]
-        return comm_list
-    return "fuckyou"
 
 
 class MyRanker(object):
@@ -63,13 +53,39 @@ class MyRanker(object):
         self.person_id_dict = {'f38edcbb-f17e-4c24-a819-daf3d022ba30': 'LiHan',
                                '111': 'LiXiang',
                                '222': 'WangJunTian'}
+        self.comment_dict = {'LiHan': ['beautiful!', 'pretty!'],
+                             'WangJunTian': ['handsome!'],
+                             'LiXiang': ['shabi']}
+        # TODO: import comment dict from config file, and easy to generate sentence.
 
     def get_faces_list(self, option):
+        """Input a pic, return a list of faces.
+
+        Args:
+            option <dict>: the same as the option in projectoxford
+
+        Returns:
+            A list of face id.
+        """
         resp = self.client.face.detect(option)
         face_list = [i['faceId']for i in resp]
         return face_list
 
     def _identify_person(self, faceid_list, group_id='goodlooking_group'):
+        """Input a list of face id, got the most similar persons of the faces.
+        Such as input ['faceid1', 'faceid2'], and return a dict like:
+        {'faceid2':'personid2'} (because face1 is not in the group)
+
+        Args:
+            faceid_list <list of facdId>:
+                a list of faceid,but we highly recommend provide only one face.
+            group_id <str>:
+                Which group you want to detect.
+
+        Returns:
+            A dict like "{'faceid1':'personid1', 'faceid1':'personid1'}",
+            if no matchs, return {}
+        """
         candidates_list = self.client.face.identify(group_id, faceid_list)
         face_person = {}
         for i in candidates_list:
@@ -82,6 +98,18 @@ class MyRanker(object):
         return face_person
 
     def get_person_list(self, input_, mode_='path', need_bad=False):
+        """Input a pic, return the people's id if they are in the good/bad looking
+            group.
+        Args:
+            input_ : input the given pic.
+            mode_ <str>: could be 'path', 'stream' or 'url'.
+            need_bad <bool>: Weather detect the ugly people, default is False,
+                            if set True, will cost double time.
+
+        Returns:
+            persons <dict>: persons['good'] is the list of goodlooking people's names,
+                            persons['bad'] is ..., but [] if need_bad is False.
+        """
         persons = {'good': [], 'bad': []}
 
         face_list = self.get_faces_list({mode_: input_})
@@ -99,9 +127,37 @@ class MyRanker(object):
 
         return persons
 
+    @staticmethod
+    def generate_sentence(name, comment, score):
+        """Generate a fluent sentence by the given information.
+            This may be extremely challenging. OJZ
+        """
+        return ' '.join((name, comment, str(score)))
+
     # TODO: try *args **kw ?
-    def rank(self, input_, mode_='path', is_num=False):
-        return 0
+    def rank(self, input_, mode_='path'):
+        """Input a pic, return a sentence contains name and score.
+            if person not in the good/bad looking group, use xiaobing to generate sentence.
+        """
+        identified_persons = self.get_person_list(input_, mode_, need_bad=False)
+        sentence_list = []
+
+        for person_name in identified_persons['good']:
+            comment = random.choice(self.comment_dict[person_name])
+            score = random.randint(95, 99)
+            sentence_list.append(self.generate_sentence(
+                person_name, comment, score))
+
+        for person_name in identified_persons['bad']:
+            comment = random.choice(self.comment_dict[person_name])
+            score = random.randint(25, 59)
+            sentence_list.append(self.generate_sentence(
+                person_name, comment, score))
+
+        if not sentence_list:
+            sentence_list.append(self.xiaobing.rank(input_, mode_))
+
+        return sentence_list
 
 
 if __name__ == '__main__':
@@ -111,6 +167,7 @@ if __name__ == '__main__':
     url_0 = 'http://139.129.25.147/6.jpg'
     url_1 = 'http://njucser.tk/6.jpg'
     mr = MyRanker(_api_keys['projectoxford']['face']['sub'])
-    print(mr.get_person_list(url_1, 'url'))
+    print(mr.rank('77.jpg'))
+    # print(mr.get_person_list(url_1, 'url'))
     # pp = PersonGroup(_api_keys['projectoxford']['face']['sub'])
     # print(pp.list())
